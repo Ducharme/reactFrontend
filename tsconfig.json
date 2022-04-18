@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "declaration": false,
+    "experimentalDecorators": true,
+    "forceConsistentCasingInFileNames": true,
+    "target": "es6",
+    "module": "es6",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "noImplicitReturns": true,
+    "noUnusedParameters": true,
+    "noImplicitThis": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "outDir": "./dist",
+    "removeComments": true,
+    "sourceMap": true,
+    "strictNullChecks": true,
+    "suppressImplicitAnyIndexErrors": true,
+    "allowJs": true,
+    "checkJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "exclude": [
+    "node_modules",
+    "static"
+  ],
+  "include": [
+    "src"
+  ]
+}

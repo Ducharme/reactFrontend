@@ -1,0 +1,26 @@
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 14
+    commands:
+      # Install dependencies needed
+      - npm install
+
+  build:
+    commands:
+      # Build the react app to give an optimized production build
+      - aws s3 cp s3://$S3_OBJECT_STORE/config/$IMAGE_REPO_NAME/.env.production .env.production
+      - npm run build
+  post_build:
+    commands:
+      # Copy the content of build folder into website s3 bucket
+      # Includes invalidating cloudfront cache as potdeploy
+      - npm run deploy:fromlocal
+      - npm run postdeploy:fromlocal
+
+artifacts:
+  name: rf_$(date +%Y-%m-%d)_$CODEBUILD_BUILD_NUMBER.zip
+  base-directory: dist
+  files:
+    - '**/*'
