@@ -10,16 +10,17 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "webpack serve --open --hot --config webpack.dev.js",
+    "build:dev": "webpack --config webpack.dev.js",
     "build": "webpack --config webpack.prod.js",
     "deploy:fromlocal": "S3BUCKET=$(grep S3_WEB_BUCKET .env.production | cut -d '=' -f2) && aws s3 sync ./dist s3://$S3BUCKET --delete",
     "postdeploy:fromlocal": "CDNDISTID=$(grep CDN_DIST_ID .env.production | cut -d '=' -f2) && aws cloudfront create-invalidation --distribution-id $CDNDISTID --paths '/*'"
   },
   "dependencies": {
+    "dotenv-webpack": "^7.0.3",
     "h3-js": "^3.7.2",
     "mapbox-gl": "^2.4.1",
     "react": "^17.0.2",
-    "react-dom": "^17.0.2",
-    "dotenv-webpack": "^7.0.3"
+    "react-dom": "^17.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.15.5",
@@ -31,8 +32,8 @@
     "@types/react": "^17.0.24",
     "@types/react-dom": "^17.0.9",
     "babel-loader": "^8.2.2",
-    "css-loader": "^6.3.0",
     "copy-webpack-plugin": "9.1.0",
+    "css-loader": "^6.3.0",
     "html-webpack-plugin": "^5.3.2",
     "style-loader": "^3.3.0",
     "terser-webpack-plugin": "^5.2.5",

@@ -1,6 +1,6 @@
 
-export const fetchCountPerHexaSync = async (endpoint: string, h3resolution: number, h3indices: [String]) => {
-    const postData = {
+export const fetchCountPerHexaAsync = async (endpoint: string, h3resolution: number, h3indices: [string]) : Promise<Response> => {
+    const queryPayload : QueryPayload = {
         "h3resolution": h3resolution,
         "h3indices": h3indices
     };
@@ -11,7 +11,7 @@ export const fetchCountPerHexaSync = async (endpoint: string, h3resolution: numb
         'Content-Type': 'application/json',
         'Accept': 'application/json'
         },
-        body: JSON.stringify(postData),
+        body: JSON.stringify(queryPayload),
     };
 
     try {
@@ -20,8 +20,14 @@ export const fetchCountPerHexaSync = async (endpoint: string, h3resolution: numb
         return data;
     } catch (e) {
         console.log(e);
-        return {};
+        var p = new Promise<Response> (() => {return {'h3resolution': h3resolution, 'h3indices': {}}; });
+        return p;
     }
+}
+
+interface QueryPayload {
+    h3resolution: number;
+    h3indices: [string];
 }
 
 export interface ResponseIndice { [key: string]: number };
@@ -30,29 +36,35 @@ export interface Response {
     h3indices: ResponseIndice;
 }
 
-function httpGetSync(endpoint: string, payload: any) : Response
+function httpGetSync(endpoint: string, queryPayload: QueryPayload) : Response
 {
     var xhr = new XMLHttpRequest();
     xhr.open("POST", endpoint, false); // false for synchronous request
     xhr.setRequestHeader("Content-Type", 'application/json');
     xhr.setRequestHeader("Accept", 'application/json');
-    xhr.send(payload);
+    const pstr = JSON.stringify(queryPayload);
+    xhr.send(pstr);
 
     console.log(`readyState=${xhr.readyState} && status=${xhr.status} && responseText=${xhr.responseText}`);
     if (xhr.readyState === 4 && xhr.status === 200) {
         return JSON.parse(xhr.responseText);
     } else {
-
-        return {'h3resolution': payload.h3resolution, 'h3indices': {}};
+        return {'h3resolution': queryPayload.h3resolution, 'h3indices': {}};
     };
 }
   
-export const getCountPerHexaSync = (endpoint: string, h3resolution: number, h3indices: [String]) : Response => {
-    const postData = {
+export const getCountPerHexaSync = (endpoint: string, h3resolution: number, h3indices: [string]) : Response => {
+    const queryPayload : QueryPayload = {
         "h3resolution": h3resolution,
         "h3indices": h3indices
     };
 
-    var resp = httpGetSync(endpoint, JSON.stringify(postData));
+    var resp: Response;
+    try {
+        resp = httpGetSync(endpoint, queryPayload);
+    } catch (e) {
+        console.log(e);
+        resp = {'h3resolution': queryPayload.h3resolution, 'h3indices': {}};
+    }
     return resp;
 }
