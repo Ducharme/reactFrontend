@@ -19,6 +19,7 @@ function getCoordinates(map: any) {
     const cLR = map.unproject([w, h]).toArray();
     const cLL = map.unproject([0, h]).toArray();
     const coordinates = [cUL, cUR, cLR, cLL];
+    console.log(`w:${w} j:${h} cUL:${cUL} cUR:${cUR} cLR:${cLR} cLL:${cLL}`)
     return coordinates;
 }
 
@@ -39,6 +40,11 @@ export interface Props {
 
 
 export default function App(props: Props) {
+
+    const latitudeMax = 90;
+    const latitudeMin = -latitudeMax;
+    const longitudeMax = 180;
+    const longitudeMin = -longitudeMax;
 
     const initialState : State = {
         center: [initialCoordinates.ctrlng, initialCoordinates.ctrlat],
@@ -67,63 +73,74 @@ export default function App(props: Props) {
         if (map === null)
             return;
 
-        const polygon = {
-            type: "Feature",
-            properties: {},
-            geometry: {
-                type: "Polygon",
-                coordinates: [ getCoordinates(map) ]
-            }
-        };
-
         var stateZoom = state.zoom;
         var currentZoom = map.getZoom();
         var h3res = getResolution(currentZoom);
+        console.log("Resolution: " + JSON.stringify(h3res));
 
-        let c = polygon.geometry.coordinates[0], coordinates=[];
-        let [x1,y2] = c[0];
-        let [x2,y1] = c[2];
-        let dh = x2 - x1;
-        let dv = y2 - y1;
+        const cc = getCoordinates(map);
+        let coordinates = [];
+        const cUL = cc[0];
+        const cLR = cc[2];
+        const x1 = Math.min(cUL[0], cLR[0]);
+        const x2 = Math.max(cUL[0], cLR[0]);
+        const y1 = Math.min(cUL[1], cLR[1]);
+        const y2 = Math.max(cUL[1], cLR[1]);
+        const dh = x2 - x1;
+        const dv = y2 - y1;
+        console.log(`REAL Coordinates x1:${x1} x2:${x2} y1:${y1} y2:${y2} dh:${dh} dv:${dv}`);
 
-        let prevX = x1 -= dh * extraFillArea;
-        x2 += dh * extraFillArea;
-        y1 = Math.max(y1 - dv * extraFillArea, -90);
-        y2 = Math.min(y2 + dv * extraFillArea, 90);
-        
-        x1 = (x1 = (x1 + 180) % 360) < 0 ? x1 + 180 : x1 - 180;
-        x2 = Math.min(x2 + x1 - prevX, x1 + 360);
-        
-        while (x1 < x2) {
-            prevX = x1;
-            x1 = Math.min(x1 + 180, x2, 180);
-            coordinates.push([[
-                [prevX,y2],
-                [x1,y2],
-                [x1,y1],
-                [prevX,y1]
-            ]]);
-            if (x1 == 180) {
-                x2 -= 180;
-                x1 = -180;
+        let x1withBuffer = x1 - dh * extraFillArea;
+        let x2withBuffer = x2 + dh * extraFillArea;
+        let y1withBuffer = y1 - dv * extraFillArea;
+        let y2withBuffer = y2 + dv * extraFillArea;
+        let fullX = x1withBuffer < longitudeMin || x2withBuffer > longitudeMax;
+
+        x1withBuffer = Math.max(x1withBuffer, longitudeMin);
+        x2withBuffer = Math.min(x2withBuffer, longitudeMax);
+        y1withBuffer = Math.max(y1withBuffer, latitudeMin);
+        y2withBuffer = Math.min(y2withBuffer, latitudeMax);
+        console.log(`BUFF Coordinates x1:${x1withBuffer} x2:${x2withBuffer} y1:${y1withBuffer} y2:${y2withBuffer} fullView:${fullX}`);
+
+        if (fullX) {
+            coordinates.push([
+                [latitudeMin, longitudeMin],
+                [latitudeMin, 0],
+                [latitudeMax, 0],
+                [latitudeMax, longitudeMin]
+            ]);
+
+            coordinates.push([
+                [latitudeMin, 0],
+                [latitudeMin, longitudeMax],
+                [latitudeMax, longitudeMax],
+                [latitudeMax, 0]
+            ]);
+        } else {
+            const xIncrement = 180;
+            let lowerX = x1withBuffer;
+            while (lowerX < longitudeMax && lowerX < x2withBuffer) {
+                let upperX = Math.min(lowerX + xIncrement, x2withBuffer, 180);
+                coordinates.push([[
+                    [y2withBuffer, lowerX],
+                    [y2withBuffer, upperX],
+                    [y1withBuffer, upperX],
+                    [y1withBuffer, lowerX]
+                ]]);
+                console.log(`PUSH Coordinates x1:${lowerX} x2:${upperX} y1:${y1withBuffer} y2:${y2withBuffer}`);
+                lowerX += xIncrement;
             }
         }
         
-        var hexagons: any = [].concat(...coordinates.map(e=> h3.polyfill(e, h3res, true)));
+        var hexagons: any = [].concat(...coordinates.map(e => { return h3.polyfill(e, h3res); }));
         var hexBoundaries:any = []
         for (var i=0; i < hexagons.length; i++) {
             let h = h3.h3ToGeoBoundary(hexagons[i], true);
-            if (h.find((e:Number[])=>e[0]<-128)!==undefined) h = h.map((e:any)=> e[0]>0 ? [e[0]-360,e[1]] : e);
-            if (hexBoundaries.find((e:any)=> {
-                if (e.length!==h.length)
-                    return false; 
-                for (let i=0; i < e.length; i++) {
-                    if ((h[i][0] !== e[i][0]) || (h[i][1] !== e[i][1])) {
-                        return false;
-                    }
-                }
-                return true;
-            })===undefined) hexBoundaries.push(h);
+            // NOTE: Replace far left negative values to avoid wrapping (lines accross at zoom 1 and 2)
+            if (h.find((e:Number[]) => e[0] < -128) !== undefined) {
+                h = h.map((e:any) => e[0]>0 ? [e[0]-360,e[1]] : e);
+            }
+            hexBoundaries.push(h);
         }
         console.log(`currentZoom: ${currentZoom}, stateZoom ${stateZoom}, resolution: ${h3res}, hexagons: ${hexBoundaries.length}`);
 
@@ -139,7 +156,7 @@ export default function App(props: Props) {
           }]
         };
 
-        var results = getCountPerHexaSync(endpoint, h3res, hexagons);
+        const results = getCountPerHexaSync(endpoint, h3res, hexagons);
         for (let index in results.h3indices)
         {
           var cnt = results.h3indices[index];
@@ -159,7 +176,7 @@ export default function App(props: Props) {
             featureCollection.features.push(markerFeature);
           }
         }
-        
+
         const source = map.getSource(sourceName);
         if (source !== undefined) {
             (source as any).setData(featureCollection);
@@ -232,7 +249,8 @@ export default function App(props: Props) {
                 container: mapContainerRef.current,
                 style: process.env.MAPBOX_STYLE_LIGHT,
                 center: state.center,
-                zoom: state.zoom[0]
+                zoom: state.zoom[0],
+                //projection: {name: 'globe'}
             });
             console.log('map created');
             

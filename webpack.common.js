@@ -4,7 +4,7 @@ const TerserPlugin = require('terser-webpack-plugin');
 
 module.exports = {
   entry: {
-    app: './src/index.js',
+    app: './src/index.tsx',
   },
   plugins: [
     new HtmlWebpackPlugin({
