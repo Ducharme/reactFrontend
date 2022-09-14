@@ -15,5 +15,9 @@
             "timeout": 15000,
             "trace": true
         }
-    ]
+    ],
+    "files.watcherExclude": {
+        "**/.git/**": true,
+        "**/node_modules/**": true,
+    }
 }
