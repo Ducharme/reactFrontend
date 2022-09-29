@@ -31,19 +31,11 @@ export interface PolygonShape {
   polygon: number[][]
 }
 
-export interface PolygonShapeResponse {
-  shapes: PolygonShape[]
-}
-
 export interface HexaShape {
   shapeId: string,
   name: string,
   type: string,
   shape: {[res: string]: string[]}
-}
-
-export interface HexaShapeResponse {
-  shapes: HexaShape[]
 }
 
 
