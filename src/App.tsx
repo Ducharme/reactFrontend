@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, SetStateAction, RefObject } from 'react';
 import mapboxgl, { GeoJSONSource, GeoJSONSourceRaw } from 'mapbox-gl'; 
-import { FeatureCollection, Feature, Geometry, GeoJsonProperties } from "geojson";
+import { FeatureCollection, Feature, GeoJsonProperties } from "geojson";
+import { centroid, Point, Polygon, polygon } from '@turf/turf';
 import { Coordinates, getResolution, initialCoordinates } from './Coordinates';
 import { getCountPerHexaSync, getPolygonFromHexaShapeSync, searchShapesSync } from './httpRequests';
-import { H3PolygonShape} from '../src/shapeTypes';
+//import { getCountPerHexaSync, getPolygonFromHexaShapeSync, searchShapesSync } from '../tests/httpRequestsMock';
+import { BaseShape, H3PolygonShape} from '../src/shapeTypes';
 import { SideBar } from './components/SideBar';
 const h3 = require("h3-js");
 
@@ -134,36 +136,38 @@ export default function App(props: Props) {
         
         // Get hexagon indices on the map with the vertical and horizontal buffer
         var polyfill : any = [].concat(...coordinates.map(e => { return h3.polyfill(e, h3res); }));
-        var hexBoundaries = [];
-        for (var i=0; i < polyfill.length; i++) {
-          let h = h3.h3ToGeoBoundary(polyfill[i], true);
-          if (h.find((e: any) => e[0] < -128) !== undefined) {
-            h = h.map((e: any) => e[0]>0 ? [e[0]-360,e[1]] : e);
-          }
-          
-          hexBoundaries.push(h);
-        }
-        console.log(`currentZoom: ${currentZoom}, stateZoom ${stateZoom}, resolution: ${h3res}, hexagons: ${hexBoundaries.length}`);
+        console.log(`currentZoom: ${currentZoom}, stateZoom ${stateZoom}, resolution: ${h3res}, hexagons: ${polyfill.length}`);
 
         const color = 'blue';
         var featureCollection : FeatureCollection = {
             "type": "FeatureCollection",
-            "features": [{
-            "type": "Feature",
-            "properties": {'color': color},
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": hexBoundaries
-            }
-            }]
+            "features": []
         };
 
         var results = getCountPerHexaSync(getCountPerHexaEndpoint, h3res, polyfill);
         for (let index in results.h3indices) {
           var cnt = results.h3indices[index];
           if (cnt > 0) {
+
+            var hexBoundaries = [];
+            let h = h3.h3ToGeoBoundary(index, true);
+            if (h.find((e: any) => e[0] < -128) !== undefined) {
+              h = h.map((e: any) => e[0]>0 ? [e[0]-360,e[1]] : e);
+            }
+            
+            hexBoundaries.push(h);
+            const hexaFeature : Feature<Polygon, GeoJsonProperties> = {
+                'type': 'Feature',
+                'properties': {'color': color},
+                'geometry': {
+                  'type': 'Polygon',
+                  'coordinates': hexBoundaries
+                }
+            };
+            featureCollection.features.push(hexaFeature);
+
             var hcc = h3.h3ToGeo(index);
-            const markerFeature : Feature<Geometry, GeoJsonProperties> = {
+            const markerFeature : Feature<Point, GeoJsonProperties> = {
               'type': 'Feature',
               'properties': {
                 'description': cnt,
@@ -198,9 +202,11 @@ export default function App(props: Props) {
                 'layout': {},
                 'paint': {
                     'line-color': ['get', 'color'],
-                    'line-width': 2
+                    'line-width': 2,
+                    'line-opacity': 0.3
                 }
             });
+
             map.addLayer({
                 'id': countLayerName,
                 'source': hexSourceName,
@@ -226,51 +232,89 @@ export default function App(props: Props) {
         if (map === null)
             return;
 
-        const polyfillLayerName = 'polyfill-layer';
+        const borderLayerName = 'pf-layer-border';
+        const fillLayerName = 'pf-layer-fill';
         const pfSourceName = 'pf-source';
-        const color = 'red';
+        const pointLayerName = 'lb-layer-point';
+        const lbSourceName = 'lb-source';
       
         var currentZoom = map.getZoom();
         var h3res = getResolution(currentZoom);
         var coordinates = getCoordinates(map);
 
         var polyfill : any = [].concat(...coordinates.map(e => { return h3.polyfill(e, h3res); }));
-        var shapes = searchShapesSync(searchShapesListEndpoint, "ACTIVE", polyfill);
+        var shapes = searchShapesSync(searchShapesListEndpoint, "ACTIVE", polyfill) as BaseShape[];
         var shapeIds = shapes.map(s => s.shapeId);
+
+        // TODO: Add h3resolution: number
         var response = getPolygonFromHexaShapeSync(fetchShapedH3Endpoint, shapeIds) as H3PolygonShape[];
 
-        var hexBoundaries : number[][][] = [];
-        for (var i=0; i < response.length; i++) {
-          hexBoundaries.push(response[i].h3polygon);
-        }
-        
-        var featureCollection : FeatureCollection = {
+        const colors = { 'LIMIT': 'lime', 'NOGO': 'red', 'PARKING': 'aqua', 'NOPARKING': 'purple'};
+        //const icons = { 'LIMIT': 'circle-stroked', 'NOGO': 'police-JP', 'PARKING': 'parking', 'NOPARKING': 'roadblock'};
+
+        var hexaFeatureCollection : FeatureCollection = {
             "type": "FeatureCollection",
-            "features": [{
-                "type": "Feature",
-                "properties": {'color': color},
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": hexBoundaries, // lng, lat
-                }
-            }]
+            "features": []
+        };
+        var labelFeatureCollection : FeatureCollection = {
+            "type": "FeatureCollection",
+            "features": []
         };
 
+        for (var i=0; i < response.length; i++) {
+            var hexBoundaries : number[][][] = [];
+            const shape = response[i];
+
+            const color = colors[shape.type];
+            //const icon = icons[shape.type];
+            
+            hexBoundaries.push(shape.h3polygon);
+            const hexaFeature : Feature<Polygon, GeoJsonProperties> = {
+                'type': 'Feature',
+                'properties': {
+                    'color': color,
+                },
+                'geometry': {
+                    'type': 'Polygon',
+                    'coordinates': hexBoundaries
+                }
+            };
+            hexaFeatureCollection.features.push(hexaFeature);
+
+            const tp = polygon(hexBoundaries, { name: 'poly' });
+            const tc = centroid(tp);
+            const lon = tc.geometry.coordinates[0];
+            const lat = tc.geometry.coordinates[1];
+
+            var pointFeature : Feature<Point, GeoJsonProperties> = {
+                'type': 'Feature',
+                'properties': {
+                    'description': `<strong>${shape.type}</strong><br/>${shape.name}`,
+                    'color': color
+                },
+                'geometry': {
+                    'type': 'Point',
+                    'coordinates': [lon, lat]
+                }
+            }
+            labelFeatureCollection.features.push(pointFeature);
+        }
+        
         const hexSource = map.getSource(pfSourceName);
         if (hexSource !== undefined) {
             var gjs = hexSource as GeoJSONSource;
             if (gjs !== undefined)
-                gjs.setData(featureCollection);
+                gjs.setData(hexaFeatureCollection);
             else
-                (hexSource as any).setData(featureCollection);
+                (hexSource as any).setData(hexaFeatureCollection);
         } else {
             var hexGeoJson : GeoJSONSourceRaw = {
                 type: 'geojson',
-                data: featureCollection,
+                data: hexaFeatureCollection,
             };
             map.addSource(pfSourceName, hexGeoJson);
             map.addLayer({
-                'id': polyfillLayerName,
+                'id': borderLayerName,
                 'source': pfSourceName,
                 'type': 'line',
                 'layout': {},
@@ -279,6 +323,88 @@ export default function App(props: Props) {
                     'line-width': 2
                 }
             });
+            map.addLayer({
+                'id': fillLayerName,
+                'source': pfSourceName,
+                'type': 'fill',
+                'layout': {},
+                'paint': {
+                    'fill-color': ['get', 'color'],
+                    'fill-opacity': 0.05
+                }
+            });
+        }
+
+
+        const lbSource = map.getSource(lbSourceName);
+        if (lbSource !== undefined) {
+            var gjs = lbSource as GeoJSONSource;
+            if (gjs !== undefined)
+                gjs.setData(labelFeatureCollection);
+            else
+                (lbSource as any).setData(labelFeatureCollection);
+        } else {
+            var lbGeoJson : GeoJSONSourceRaw = {
+                type: 'geojson',
+                data: labelFeatureCollection,
+            };
+            map.addSource(lbSourceName, lbGeoJson);
+
+            // Add a layer showing the places.
+            map.addLayer({
+                'id': pointLayerName,
+                'type': 'circle',
+                'source': lbSourceName,
+                'paint': {
+                    'circle-color': ['get', 'color'],
+                    'circle-radius': 6,
+                    'circle-stroke-width': 2,
+                    'circle-stroke-color': ['get', 'color']
+                }
+            });
+                
+            // Create a popup, but don't add it to the map yet.
+            const popup = new mapboxgl.Popup({
+                closeButton: false,
+                closeOnClick: false
+            });
+                
+            map.on('mouseenter', pointLayerName, (e) => {
+                if (map === null || e == undefined || e.features == undefined)
+                    return;
+                
+                console.log(e);
+                // Change the cursor style as a UI indicator.
+                map.getCanvas().style.cursor = 'pointer';
+                
+                var ef0 = e.features[0] as Feature<Point, GeoJsonProperties>;
+                if (ef0 == undefined || ef0.properties == null)
+                    return;
+
+                // Copy coordinates array.
+                const coordinates = ef0.geometry.coordinates.slice();
+                const description = ef0.properties.description;
+                
+                // Ensure that if the map is zoomed out such that multiple
+                // copies of the feature are visible, the popup appears
+                // over the copy being pointed to.
+                while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                    coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+                }
+                
+                // Populate the popup and set its coordinates based on the feature found.
+                const ll = new mapboxgl.LngLat(coordinates[0], coordinates[1]);
+                popup.setLngLat(ll).setHTML(description).addTo(map);
+            });
+                
+            map.on('mouseleave', pointLayerName, () => {
+                if (map === null)
+                    return;
+
+                map.getCanvas().style.cursor = '';
+                popup.remove();
+            });
+            
         }
       }, [map, state.zoom]);
     
@@ -319,7 +445,7 @@ export default function App(props: Props) {
             });
             //map.setMapProjection(MapProjection.Globe)
             console.log('map created');
-            
+
             setMap(map);
         }
     
@@ -359,6 +485,7 @@ export default function App(props: Props) {
             console.log('cleaning useEffect load');
         };
     }, [map, props, updateState, renderHexes, renderPolyfill]);
+
 
     useEffect(() => {
         console.log('entering useEffect zoomend');

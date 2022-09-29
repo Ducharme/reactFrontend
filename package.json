@@ -23,7 +23,8 @@
     "react-dom": "^18.2.0",
     "@turf/turf": "^6.5.0",
     "@turf/union": "^6.5.0",
-    "@turf/intersect": "^6.5.0"
+    "@turf/intersect": "^6.5.0",
+    "@turf/centroid": "^6.5.0"
   },
   "devDependencies": {
     "@babel/core": "^7.18.5",
