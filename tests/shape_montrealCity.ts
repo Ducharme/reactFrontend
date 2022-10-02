@@ -55,7 +55,7 @@ export const getShapeIds = (/*h3resolution: number,*/ h3indices: string[]) : str
 }
 
 export const searchShapesSyncMock = (endpoint: string, status: string, h3indices: string[]) : BaseShape[] => {
-  console.debug(`Call to endpoint: ${endpoint} with status=${status} h3indices=${h3indices}`);
+  console.debug(`Call to endpoint (searchShapesSyncMock): ${endpoint} with status=${status} h3indices=${h3indices}`);
 
   var bss = shapesArr.map(s => {
     var bs : BaseShape = {
@@ -70,7 +70,7 @@ export const searchShapesSyncMock = (endpoint: string, status: string, h3indices
 }
 
 export const getPolygonShapeSyncMock = (endpoint: string, h3resolution: number, h3indices: string[]) : PolygonShape[] => {
-  console.debug(`Call to endpoint: ${endpoint} with h3resolution=${h3resolution}`);
+  console.debug(`Call to endpoint (getPolygonShapeSyncMock): ${endpoint} with h3resolution=${h3resolution}`);
   
   var shapeIds = getShapeIds(h3indices);
   console.log(`shapeIds are: ${shapeIds.join(',')}`);

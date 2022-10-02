@@ -19,7 +19,7 @@ interface getCountPerHexaSyncMockResponse {
 }*/
 
 export const getCountPerHexaSyncMock = (endpoint: string, h3resolution: number, h3indices: [String]) : getCountPerHexaSyncMockResponse => {
-  console.debug("Call to endpoint: " + endpoint);
+  console.debug(`Call to endpoint (getCountPerHexaSyncMock): ${endpoint}`);
   
   var hexas = {};
   for (var i=0; i < h3indices.length; i++) {
