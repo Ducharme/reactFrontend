@@ -114,7 +114,7 @@ export const getPolygonFromHexaShapeSyncMock = (endpoint: string, shapeIds: stri
       if (h3indexList.length == 1 && h3indexList[0] == "UNDEFINED")
         continue;
 
-      const isGeoJson = false;
+      const isGeoJson = false; //BUG forcing to set false: https://github.com/Turfjs/turf/issues/2048
       var mergedPolygons = h3.h3SetToMultiPolygon(h3indexList, isGeoJson); // returns [][][][]
       if (verbose) {
         console.log("mergedPolygons");
@@ -158,7 +158,9 @@ export const getPolygonFromHexaShapeSyncMock = (endpoint: string, shapeIds: stri
       var sp : any = turfPolygons[0];
       turfPolygons.shift();
 
+      var counter = 0;
       while (turfPolygons.length > 0) {
+        counter = counter + 1;
         if (verbose)
           console.log("turfPolygons.length=" + turfPolygons.length);
 
@@ -166,6 +168,11 @@ export const getPolygonFromHexaShapeSyncMock = (endpoint: string, shapeIds: stri
           var p2 = turfPolygons[e];
           var isct = intersect(sp, p2);
           if (isct !== null) {
+            if (isct.geometry.type == "MultiPolygon") {
+              console.log("MultiPolygon isct" );
+              console.log(isct);
+            }
+
             var u = union(sp, p2);
             if (u === undefined || u === null || u.geometry === undefined || u.geometry === null)
               continue;
@@ -176,6 +183,7 @@ export const getPolygonFromHexaShapeSyncMock = (endpoint: string, shapeIds: stri
           }
         }
       }
+      console.log(`counter=${counter}`);
       singlePolygon = polygon(sp.coordinates, { name: 'singlePolygon' });
       if (verbose) {
         console.log("singlePolygon = sp");
