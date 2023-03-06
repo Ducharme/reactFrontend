@@ -28,6 +28,7 @@ module.exports = merge(common, {
     new Dotenv({
       path: './.env.development',
       safe: true,
+      sample: './.env.example.development',
       allowEmptyValues: false,
       silent: false,
       defaults: false
@@ -36,6 +37,22 @@ module.exports = merge(common, {
   devtool: 'inline-source-map',
   devServer: {
     static: './dist',
+    client: {
+      //logging: 'verbose',
+      overlay: {
+        errors: true,
+        warnings: true,
+      },
+      reconnect: true,
+    },
+    host: '0.0.0.0',
+    port: 8080,
+    open: {
+      app: {
+        name: 'google-chrome',
+        arguments: ['--incognito', '--new-window'],
+      },
+    },
   },
   watchOptions: {
     ignored: [

@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef, SetStateAction, RefObject } from 'react';
-import mapboxgl, { GeoJSONSource, GeoJSONSourceRaw } from 'mapbox-gl'; 
+import React, { useState, useEffect, useRef } from 'react';
+import { GeoJSONSource, GeoJSONSourceRaw, Map as MapboxMap, Popup, LngLat, NavigationControl } from 'mapbox-gl'; 
 import { FeatureCollection, Feature, GeoJsonProperties } from "geojson";
 import { centroid, Point, Polygon, polygon } from '@turf/turf';
 import { Coordinates, getResolution, initialCoordinates } from './Coordinates';
 import { getCountPerHexaSync, getPolygonFromHexaShapeSync, searchShapesSync } from './httpRequests';
 //import { getCountPerHexaSync, getPolygonFromHexaShapeSync, searchShapesSync } from '../tests/httpRequestsMock';
 import { BaseShape, H3PolygonShape} from '../src/shapeTypes';
+import { AnimateDevices } from "./AnimateDevices";
 import { SideBar } from './components/SideBar';
 const h3 = require("h3-js");
 
@@ -15,8 +16,7 @@ const getCountPerHexaEndpoint = ReactCdn + "/h3/aggregate/devices/count";
 const fetchShapedH3Endpoint = ReactCdn + "/h3/fetch/shapes/h3polygon";
 const searchShapesListEndpoint = ReactCdn + "/h3/search/shapes/list";
 //const ShapesCdn = process.env.SHAPES_CDN!;
-mapboxgl.accessToken = process.env.MAPBOX_TOKEN!;
-
+const MapboxToken : string = process.env.MAPBOX_TOKEN!;
 
 function getMapUnprojectedCoordinates(map: any) {
     const w = window.innerWidth;
@@ -62,10 +62,11 @@ export default function App(props: Props) {
   
     const [state, setState] = useState<State>(() => getInitialState());
 
-    const mapContainerRef = useRef<HTMLDivElement>(null);
-    let [map, setMap] = useState<mapboxgl.Map | null>(null);
+    const mapContainer = useRef<string | HTMLElement>(null);
+    var map = useRef<MapboxMap | null>(null);
+    var ani = useRef<AnimateDevices | null>();
 
-    function getCoordinates(map2: mapboxgl.Map) {
+    function getCoordinates(map2: MapboxMap) {
         const extraFillArea = 0.5;
         const cc = getMapUnprojectedCoordinates(map2);
         let coordinates = [];
@@ -120,9 +121,8 @@ export default function App(props: Props) {
         return coordinates;
     }
 
-
     const renderHexes = React.useCallback(() => { 
-        if (map === null)
+        if (map === null || map.current === null)
             return;
 
         const borderLayerName = 'hex-layer-border';
@@ -130,9 +130,9 @@ export default function App(props: Props) {
         const hexSourceName = 'hex-source';
         
         var stateZoom = state.zoom;
-        var currentZoom = map.getZoom();
+        var currentZoom = map.current.getZoom();
         var h3res = getResolution(currentZoom);
-        var coordinates = getCoordinates(map);
+        var coordinates = getCoordinates(map.current);
         
         // Get hexagon indices on the map with the vertical and horizontal buffer
         var polyfill : any = [].concat(...coordinates.map(e => { return h3.polyfill(e, h3res); }));
@@ -182,7 +182,7 @@ export default function App(props: Props) {
           }
         }
         
-        const hexSource = map.getSource(hexSourceName);
+        const hexSource = map.current.getSource(hexSourceName);
         if (hexSource !== undefined) {
             var gjs = hexSource as GeoJSONSource;
             if (gjs !== undefined)
@@ -194,8 +194,8 @@ export default function App(props: Props) {
                 type: 'geojson',
                 data: featureCollection,
             };
-            map.addSource(hexSourceName, hexGeoJson);
-            map.addLayer({
+            map.current.addSource(hexSourceName, hexGeoJson);
+            map.current.addLayer({
                 'id': borderLayerName,
                 'source': hexSourceName,
                 'type': 'line',
@@ -207,7 +207,7 @@ export default function App(props: Props) {
                 }
             });
 
-            map.addLayer({
+            map.current.addLayer({
                 'id': countLayerName,
                 'source': hexSourceName,
                 'type': 'symbol',
@@ -227,9 +227,8 @@ export default function App(props: Props) {
         }
     }, [map, state.zoom]);
 
-
     const renderPolyfill = React.useCallback(() => { 
-        if (map === null)
+        if (map === null || map.current === null)
             return;
 
         const borderLayerName = 'pf-layer-border';
@@ -238,9 +237,9 @@ export default function App(props: Props) {
         const pointLayerName = 'lb-layer-point';
         const lbSourceName = 'lb-source';
       
-        var currentZoom = map.getZoom();
+        var currentZoom = map.current.getZoom();
         var h3res = getResolution(currentZoom);
-        var coordinates = getCoordinates(map);
+        var coordinates = getCoordinates(map.current);
 
         var polyfill : any = [].concat(...coordinates.map(e => { return h3.polyfill(e, h3res); }));
         var shapes = searchShapesSync(searchShapesListEndpoint, "ACTIVE", polyfill) as BaseShape[];
@@ -300,7 +299,7 @@ export default function App(props: Props) {
             labelFeatureCollection.features.push(pointFeature);
         }
         
-        const hexSource = map.getSource(pfSourceName);
+        const hexSource = map.current.getSource(pfSourceName);
         if (hexSource !== undefined) {
             var gjs = hexSource as GeoJSONSource;
             if (gjs !== undefined)
@@ -312,8 +311,8 @@ export default function App(props: Props) {
                 type: 'geojson',
                 data: hexaFeatureCollection,
             };
-            map.addSource(pfSourceName, hexGeoJson);
-            map.addLayer({
+            map.current.addSource(pfSourceName, hexGeoJson);
+            map.current.addLayer({
                 'id': borderLayerName,
                 'source': pfSourceName,
                 'type': 'line',
@@ -323,7 +322,7 @@ export default function App(props: Props) {
                     'line-width': 2
                 }
             });
-            map.addLayer({
+            map.current.addLayer({
                 'id': fillLayerName,
                 'source': pfSourceName,
                 'type': 'fill',
@@ -336,7 +335,7 @@ export default function App(props: Props) {
         }
 
 
-        const lbSource = map.getSource(lbSourceName);
+        const lbSource = map.current.getSource(lbSourceName);
         if (lbSource !== undefined) {
             var gjs = lbSource as GeoJSONSource;
             if (gjs !== undefined)
@@ -348,10 +347,10 @@ export default function App(props: Props) {
                 type: 'geojson',
                 data: labelFeatureCollection,
             };
-            map.addSource(lbSourceName, lbGeoJson);
+            map.current.addSource(lbSourceName, lbGeoJson);
 
             // Add a layer showing the places.
-            map.addLayer({
+            map.current.addLayer({
                 'id': pointLayerName,
                 'type': 'circle',
                 'source': lbSourceName,
@@ -364,18 +363,18 @@ export default function App(props: Props) {
             });
                 
             // Create a popup, but don't add it to the map yet.
-            const popup = new mapboxgl.Popup({
+            const popup = new Popup({
                 closeButton: false,
                 closeOnClick: false
             });
                 
-            map.on('mouseenter', pointLayerName, (e) => {
-                if (map === null || e == undefined || e.features == undefined)
+            map.current.on('mouseenter', pointLayerName, (e) => {
+                if (map === null || map.current === null || e == undefined || e.features == undefined)
                     return;
                 
                 console.log(e);
                 // Change the cursor style as a UI indicator.
-                map.getCanvas().style.cursor = 'pointer';
+                map.current.getCanvas().style.cursor = 'pointer';
                 
                 var ef0 = e.features[0] as Feature<Point, GeoJsonProperties>;
                 if (ef0 == undefined || ef0.properties == null)
@@ -393,15 +392,15 @@ export default function App(props: Props) {
                 }
                 
                 // Populate the popup and set its coordinates based on the feature found.
-                const ll = new mapboxgl.LngLat(coordinates[0], coordinates[1]);
-                popup.setLngLat(ll).setHTML(description).addTo(map);
+                const ll = new LngLat(coordinates[0], coordinates[1]);
+                popup.setLngLat(ll).setHTML(description).addTo(map.current);
             });
                 
-            map.on('mouseleave', pointLayerName, () => {
-                if (map === null)
+            map.current.on('mouseleave', pointLayerName, () => {
+                if (map === null || map.current === null)
                     return;
 
-                map.getCanvas().style.cursor = '';
+                map.current.getCanvas().style.cursor = '';
                 popup.remove();
             });
             
@@ -430,29 +429,27 @@ export default function App(props: Props) {
     }, []);
 
     useEffect(() => {
-        console.log('entering useEffect attachMap');
-    
-        const attachMap = (setMap: React.Dispatch<SetStateAction<any>>, mapContainerRef: RefObject<HTMLDivElement>) => {
-            if (!mapContainerRef.current) {
-                return;
-            }
-        
-            const map = new mapboxgl.Map({
-                container: mapContainerRef.current,
-                style: process.env.MAPBOX_STYLE_LIGHT,
-                center: state.center,
-                zoom: state.zoom[0]
-            });
-            //map.setMapProjection(MapProjection.Globe)
-            console.log('map created');
-
-            setMap(map);
+        if (map.current) {
+            console.log("Map is already initialized");
+            return; // initialize map only once
         }
-    
-        !map && attachMap(setMap, mapContainerRef);
-        return () => {
-            console.log("cleaning useEffect attachMap");
-        };
+        if (mapContainer.current === undefined || mapContainer.current === null) {
+            console.log("mapContainer is null or undefined");
+            return;
+        }
+
+        map.current = new MapboxMap({
+            accessToken: MapboxToken,
+            container: mapContainer.current!,
+            style: process.env.MAPBOX_STYLE_LIGHT,
+            center: state.center,
+            zoom: state.zoom[0]
+        });
+
+        // disable map rotation using right click + drag
+        map.current.dragRotate.disable();
+        // disable map rotation using touch rotation gesture
+        map.current.touchZoomRotate.disableRotation();
     }, [map, state.center, state.zoom]);
 
     useEffect(() => {
@@ -470,31 +467,37 @@ export default function App(props: Props) {
     useEffect(() => {
         console.log('entering useEffect load');
 
-        if (map === null) {
+        if (map === null || map.current === null) {
             return;
         }
 
-        map.on('load', (map2: any) => {
+        map.current.on('load', (map2: any) => {
             renderHexes();
             renderPolyfill();
             updateState(map2);
+
+            const m = map2.target as MapboxMap;
+            if (m) {
+                const ad = new AnimateDevices(m);
+                ani.current = ad;
+                ad.load();
+              }
         });
-        map.addControl(new mapboxgl.NavigationControl());
+        map.current.addControl(new NavigationControl());
 
         return () => {
             console.log('cleaning useEffect load');
         };
     }, [map, props, updateState, renderHexes, renderPolyfill]);
 
-
     useEffect(() => {
         console.log('entering useEffect zoomend');
 
-        if (map === null) {
+        if (map === null || map.current === null) {
             return;
         }
 
-        map.on('zoomend', (map2: any) => {
+        map.current.on('zoomend', (map2: any) => {
             const { onZoomEnd } = props;
             console.log("onZoomEnd");
             renderHexes();
@@ -511,11 +514,11 @@ export default function App(props: Props) {
     useEffect(() => {
         console.log('entering useEffect dragend');
 
-        if (map === null) {
+        if (map === null || map.current === null) {
             return;
         }
 
-        map.on('dragend', (map2: any) => {
+        map.current.on('dragend', (map2: any) => {
             const { onDragEnd } = props;
             console.log("onDragEnd");
             renderHexes();
@@ -532,23 +535,28 @@ export default function App(props: Props) {
     useEffect(() => {
         console.log('entering useEffect resize');
 
-        if (map === null) {
+        if (map === null || map.current === null) {
             return;
         }
 
         window.onresize = () => {
             let canvas = document.getElementsByClassName('map-container mapboxgl-map')[0] as any;
-            canvas.style.width = window.innerWidth + "px";
-            canvas.style.height = window.innerHeight + "px";
-            if (map !== null) {
-                map.getCanvas().style.width = window.innerWidth + "px";
-                map.getCanvas().style.height = window.innerHeight + "px";
-                map.resize();
+            if (canvas === undefined || canvas === null) {
+                console.log("canvas is null or undefined");
+            } else {
+                canvas.style.width = window.innerWidth + "px";
+                canvas.style.height = window.innerHeight + "px";
+            }
+
+            if (map !== null && map.current !== null) {
+                map.current.getCanvas().style.width = window.innerWidth + "px";
+                map.current.getCanvas().style.height = window.innerHeight + "px";
+                map.current.resize();
             }
         };
 
         window.onresize(new UIEvent(''));
-        map.on('resize', (map2: any) => {
+        map.current.on('resize', (map2: any) => {
             const { onResize } = props;
             console.log("onResize");
             renderHexes();
@@ -564,7 +572,7 @@ export default function App(props: Props) {
 
     return (
       <div>
-        <div ref={mapContainerRef} className="map-container" />
+        <div ref={mapContainer as React.RefObject<HTMLDivElement>} className="map-container" />
         <SideBar {...state.coordinates} />
       </div>
     );
