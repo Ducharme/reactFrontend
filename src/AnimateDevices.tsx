@@ -35,17 +35,25 @@ interface DevicePosition {
     seq: number;
 }
 
-// Converts from degrees to radians.
-function toRadians(degrees: number) {
-    return degrees * Math.PI / 180;
-};
-   
-// Converts from radians to degrees.
-function toDegrees(radians: number) {
-    return radians * 180 / Math.PI;
+// {"deviceId":"test-001","dts":1678326670819,"seq":9,"lng":-73.07884599424962,"lat":45.99171000575034,"alt":12.822822005750348,"h3r15":"8f2baad7234836a"}
+interface StreamDev {
+  deviceId: string;
+  dts: Date;
+  seq: number;
+  lng: number;
+  lat: number;
+  alt: number;
+  h3r15: string;
+  state: string | undefined;
 }
 
-function getBearing(startLatInDeg: number, startLngInDeg: number, destLatInDeg: number, destLngInDeg: number){
+// Converts from degrees to radians.
+const toRadians = (degrees: number) : number => degrees * Math.PI / 180.0;
+   
+// Converts from radians to degrees.
+const toDegrees = (radians: number) : number => radians * 180.0 / Math.PI;
+
+const getBearing = (startLatInDeg: number, startLngInDeg: number, destLatInDeg: number, destLngInDeg: number) : number => {
     const startLatInRad = toRadians(startLatInDeg);
     const startLngInRad = toRadians(startLngInDeg);
     const destLatInRad = toRadians(destLatInDeg);
@@ -56,8 +64,8 @@ function getBearing(startLatInDeg: number, startLngInDeg: number, destLatInDeg: 
             Math.sin(startLatInRad) * Math.cos(destLatInRad) * Math.cos(destLngInRad - startLngInRad);
     const brngInRad = Math.atan2(y, x);
     const brngInDeg = toDegrees(brngInRad);
-    return (brngInDeg + 360) % 360;
-}
+    return (brngInDeg + 360.0) % 360;
+};
 
 export class AnimateDevices {
 
@@ -73,24 +81,24 @@ export class AnimateDevices {
         this.ws.onmessage = this.messageReceivedHandler;
     }
 
-    readonly devicePositions: DevicePositions = {};
-    readonly deviceAnimations : DeviceAnimations = {};
-    readonly symbolFeatures: Feature<Point>[] = [];
-    readonly symbolFeatureCollection = featureCollection<Point>(this.symbolFeatures);
-    readonly traceFeatures: Feature<LineString>[] = [];
-    readonly traceFeatureCollection = featureCollection<LineString>(this.traceFeatures);
+    private readonly devicePositions: DevicePositions = {};
+    private readonly deviceAnimations : DeviceAnimations = {};
+    private readonly symbolFeatures: Feature<Point>[] = [];
+    private readonly symbolFeatureCollection = featureCollection<Point>(this.symbolFeatures);
+    private readonly traceFeatures: Feature<LineString>[] = [];
+    private readonly traceFeatureCollection = featureCollection<LineString>(this.traceFeatures);
 
-    readonly ws : WebSocket;
-    readonly timerAnimation : NodeJS.Timer;
-    readonly map: MapboxMap;
+    private readonly ws : WebSocket;
+    private readonly timerAnimation : NodeJS.Timer;
+    private readonly map: MapboxMap;
 
-    readonly arrowIcon = "up-arrow.png";
-    readonly arrowName = "up-arrow";
+    private readonly arrowIcon = "up-arrow.png";
+    private readonly arrowName = "up-arrow";
 
-    readonly symbolSourceName = "symbol-source";
-    readonly traceSourceName = "trace-source";
-    readonly symbolLayerName = "symbol-layer";
-    readonly traceLayerName = "trace-layer";
+    private readonly symbolSourceName = "symbol-source";
+    private readonly traceSourceName = "trace-source";
+    private readonly symbolLayerName = "symbol-layer";
+    private readonly traceLayerName = "trace-layer";
 
     load() {
         //console.log("load begin");
@@ -99,7 +107,7 @@ export class AnimateDevices {
                 if (error)
                     throw error;
                 
-                if (this.map !== null && !this.map.hasImage(this.arrowName))
+                if (this.map && !this.map.hasImage(this.arrowName))
                     this.map.addImage(this.arrowName, image);
 
                 this.addSymbolSourceAndLayer();
@@ -110,16 +118,16 @@ export class AnimateDevices {
     }
 
     private addSymbolSourceAndLayer() {
-        var symbolSource = this.map.getSource(this.symbolSourceName);
-        if (symbolSource === null || symbolSource === undefined) {
+        const symbolSource = this.map.getSource(this.symbolSourceName);
+        if (!symbolSource) {
             this.map.addSource(this.symbolSourceName, {
                 type: "geojson",
                 data: this.symbolFeatureCollection
             });
         }
     
-        var symbolLayer = this.map.getLayer(this.symbolLayerName);
-        if (symbolLayer === null || symbolLayer === undefined) {
+        const symbolLayer = this.map.getLayer(this.symbolLayerName);
+        if (!symbolLayer) {
             this.map.addLayer({
                 id: this.symbolLayerName,
                 source: this.symbolSourceName,
@@ -132,11 +140,12 @@ export class AnimateDevices {
                     "text-allow-overlap": true
                 }
             });
+            this.map.moveLayer(this.symbolLayerName);
         }
     }
 
     private addTraceSourceAndLayer() {
-        var traceSource = this.map.getSource(this.traceSourceName);
+        const traceSource = this.map.getSource(this.traceSourceName);
         if (!traceSource) {
             //console.log("Adding source " + this.traceSourceName);
             this.map.addSource(this.traceSourceName, {
@@ -145,7 +154,7 @@ export class AnimateDevices {
             });
         };
     
-        var traceLayer = this.map.getLayer(this.traceLayerName);
+        const traceLayer = this.map.getLayer(this.traceLayerName);
         if (!traceLayer) {
             //console.log("Adding layer " + this.traceLayerName);
             this.map.addLayer({
@@ -290,12 +299,12 @@ export class AnimateDevices {
         }
       }
   
-      if (this.map === null) {
+      if (!this.map) {
         return;
       }
   
-      var symbolSource = this.map.getSource(this.symbolSourceName) as GeoJSONSource;
-      if (symbolSource !== undefined) {
+      const symbolSource = this.map.getSource(this.symbolSourceName) as GeoJSONSource;
+      if (symbolSource) {
         //console.log(`symbolSource.setData(symbolFeatureCollection);`);
         symbolSource.setData(this.symbolFeatureCollection);
       }
@@ -304,7 +313,7 @@ export class AnimateDevices {
     private socketOpenedHandler = (event: any) => {
         console.log("We are connected");
     
-        if (event == null || event === undefined || event.target === null) {
+        if (!event || !event.target) {
             return;
         }
     
@@ -315,15 +324,17 @@ export class AnimateDevices {
 
     private messageReceivedHandler = (event: any) => {
         //console.log(event);
-        if (event == null || event === undefined || event.data === null && event.data === undefined)
+        if (!event || !event.data)
             return;
     
-        console.log(event.data);
+        //console.log(event.data);
         // {"deviceId":"test-002","dts":1674363622286,"seq":22,"lng":-77.40573734683353,"lat":41.66481865316644,"alt":8.495930653166461,"h3r15":"8f2aa015411c4d8"}
         if (!event.data.startsWith("{") || !event.data.endsWith("}")) {
             return;
         }
     
+        const sd = JSON.parse(event.data) as StreamDev;
+        console.log(sd);
         const json = JSON.parse(event.data);
         const deviceId = json.deviceId;
         const lng = json.lng as number;
@@ -331,7 +342,7 @@ export class AnimateDevices {
         const dts = new Date(json.dts);
         const seq = json.seq as number;
         const dp : DevicePosition = {lng: lng, lat: lat, time: dts, seq: seq};
-    
+  
         const positions = this.devicePositions[deviceId];
         if (positions === undefined) {
             this.devicePositions[deviceId] = [dp];
@@ -339,39 +350,40 @@ export class AnimateDevices {
         } else {
             const prevPos = positions[positions.length-1];
             //console.log("prevPos: " + JSON.stringify(prevPos));
+            if (prevPos.seq >= seq) {
+              return;
+            }
             this.devicePositions[deviceId].push(dp);
     
-            const lng0 = prevPos.lng;
-            const lat0 = prevPos.lat;
-            const dts0 = prevPos.time;
+            const { lng: lng0, lat: lat0, time: dts0 } = prevPos;
     
             const startTime = new Date();
             const totalTime = dts.getTime() - dts0.getTime();
             const endTime = new Date(startTime.getTime() + totalTime);
             var animation : Animation = {
-            devDate: dts,
-            prevDevDate: dts0,
-            totalTime: totalTime,
-            startDate: startTime,
-            endDate: endTime,
-            startLat: lat0,
-            startLng: lng0,
-            deltaLat: lat - lat0, // TODO: Fix wrap up
-            deltaLng: lng - lng0, // TODO: Fix wrap up
-            endLat: lat,
-            endLng: lng,
-            curLat: -1000, // For tracking
-            curLng: -1000, // For tracking
-            bearing: getBearing(lat0, lng0, lat, lng),
-            seq: seq
+              devDate: dts,
+              prevDevDate: dts0,
+              totalTime: totalTime,
+              startDate: startTime,
+              endDate: endTime,
+              startLat: lat0,
+              startLng: lng0,
+              deltaLat: lat - lat0, // TODO: Fix wrap up
+              deltaLng: lng - lng0, // TODO: Fix wrap up
+              endLat: lat,
+              endLng: lng,
+              curLat: -1000, // For tracking
+              curLng: -1000, // For tracking
+              bearing: getBearing(lat0, lng0, lat, lng),
+              seq: seq
             };
     
-            if (this.deviceAnimations[deviceId] === null || this.deviceAnimations[deviceId] === undefined) {
+            if (!this.deviceAnimations[deviceId]) {
                 this.deviceAnimations[deviceId] = [animation];
             } else {
                 this.deviceAnimations[deviceId].push(animation);
             }
-            console.log(animation);
+            //console.log(animation);
         }
     
         var ls = this.getTraceFeature(deviceId);
@@ -384,8 +396,8 @@ export class AnimateDevices {
             //console.log("traceFeatureCollection.features.coordinates added");
         }
     
-        if (this.map !== null) {
-            var traceSource = this.map.getSource(this.traceSourceName) as GeoJSONSource;
+        if (this.map) {
+            const traceSource = this.map.getSource(this.traceSourceName) as GeoJSONSource;
             if (traceSource) { // TODO: Fix wrap up
               traceSource.setData(this.traceFeatureCollection);
             }

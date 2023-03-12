@@ -6,7 +6,7 @@ import { Coordinates, getResolution, initialCoordinates } from './Coordinates';
 import { getCountPerHexaSync, getPolygonFromHexaShapeSync, searchShapesSync } from './httpRequests';
 //import { getCountPerHexaSync, getPolygonFromHexaShapeSync, searchShapesSync } from '../tests/httpRequestsMock';
 import { BaseShape, H3PolygonShape} from '../src/shapeTypes';
-import { AnimateDevices } from "./AnimateDevices";
+import { AnimateDevices } from "./AnimateDevices"; // -ori
 import { SideBar } from './components/SideBar';
 const h3 = require("h3-js");
 
@@ -218,7 +218,9 @@ export default function App(props: Props) {
                     'text-justify': 'auto',
                     'icon-image': ['get', 'icon'],
                     'text-font': ['Open Sans Regular'],
-                    'text-size': 12
+                    'text-size': 12,
+                    "icon-allow-overlap" : true,
+                    "text-allow-overlap": true
                     },
                 "paint": {
                     'text-color': color
