@@ -168,7 +168,7 @@ export const getPolygonFromHexaShapeSyncMock = (endpoint: string, shapeIds: stri
           var p2 = turfPolygons[e];
           var isct = intersect(sp, p2);
           if (isct !== null) {
-            if (isct.geometry.type == "MultiPolygon") {
+            if (verbose && isct.geometry.type == "MultiPolygon") {
               console.log("MultiPolygon isct" );
               console.log(isct);
             }
@@ -183,9 +183,9 @@ export const getPolygonFromHexaShapeSyncMock = (endpoint: string, shapeIds: stri
           }
         }
       }
-      console.log(`counter=${counter}`);
       singlePolygon = polygon(sp.coordinates, { name: 'singlePolygon' });
       if (verbose) {
+        console.log(`counter=${counter}`);
         console.log("singlePolygon = sp");
         console.log(sp);
       }
